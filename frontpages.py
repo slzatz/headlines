@@ -4,6 +4,7 @@ import requests
 from bs4 import BeautifulSoup
 import shutil
 import os
+import json
 from newspaper_list import newspapers
 
 #url = 'https://www.frontpages.com/newspaper-list'  
@@ -34,9 +35,16 @@ def retrieve_images(url):
         #select_images[index] = '/g'+value.removeprefix('/t') + '.jpg'
         select_images[index] = '/g'+value.removeprefix('/t')
     
+    for key, value in dd.items():
+        dd[key] = '/g'+value.removeprefix('/t')
+
     with open('frontpageurls.py', 'w') as file:
         text = "urls = " + repr(select_images)
         file.write(text)
+# Serialization with json
+
+    with open('frontpageurls.json', 'w') as file:
+        json.dump(dd, file)
 
     #file_path = '/home/slzatz/frontpages/frontpageurls.py'
 

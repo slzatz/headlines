@@ -5,7 +5,9 @@ import requests
 import wand.image
 from io import BytesIO
 import random
+import json
 from frontpageurls import urls
+#from newspaper_list import newspapers
 
 app = Flask(__name__)
 
@@ -69,6 +71,25 @@ def imagejpg():
     f = display_image("https://www.frontpages.com" + partial_url, 400, 800)
     #f = display_image("https://www.frontpages.com" + partial_url)
     return send_file("fp.jpg", mimetype="image/jpg")
+
+@app.route("/newspaper/<name>")
+def newspaper(name):
+    # Deserialization with json
+    with open('frontpageurls.json', 'r') as f:
+        newspapers = json.load(f)
+    selection = newspapers.get(name, None)
+    if selection:
+        f = display_image("https://www.frontpages.com" + selection, 400, 800)
+        return send_file("fp.jpg", mimetype="image/jpg")
+    else:
+        return f"No newspaper with name {name} found", 404
+
+@app.route("/newspapers")
+def newspapers():
+    # Deserialization with json
+    with open('frontpageurls.json', 'r') as f:
+        newspapers = json.load(f)
+    return list(newspapers.keys())
 
 if __name__ == "__main__":
     app.run(debug=True,
