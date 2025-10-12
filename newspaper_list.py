@@ -5,7 +5,9 @@ newspapers = [
 "the-washington-post", # us
 "los-angeles-times", # us
 "the-boston-globe", # us
+"chicago-tribune", # us
 #"the-washington-times", # us
+"houston-chronicle", # us
 "usa-today", # us
 "le-monde", # france
 "le-figaro", # france
@@ -20,7 +22,9 @@ newspapers = [
 #"the-sun", # uk #tabloid
 #"daily-mirror", # uk #tabloid
 #"daily-express", # uk #tabloid
-"bild", # germany
+#"bild", # germany tabloid
+"der-tagesspiegel", # germany
+"frankfurter-allgemeine-zeitung", # germany
 "suddeutsche-zeitung", # germany
 "die-welt", # germany
 "el-pais", # spain
@@ -30,8 +34,8 @@ newspapers = [
 "haaretz", # israel
 "the-jerusalem-post", # israel
 "de-telegraaf", # netherlands
-"yomiuri-shimbun", # japan
-"mainichi-shimbun", # japan
+"yomiuri-shinbun", # japan
+"mainichi-shinbun", # japan
 #"asahi-shimbun", # japan #not in list
 "people-s-daily", # china
 "herald-sun", # australia
@@ -40,5 +44,6 @@ newspapers = [
 "la-stampa", # italy
 "neue-zurcher-zeitung", # switzerland
 "the-globe-and-mail", # canada
-"kronen-zeitung", # austria
+"die-presse", # austria
+#"kronen-zeitung", # austria #tabloid
 ]

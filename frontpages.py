@@ -1,4 +1,4 @@
-#!/home/slzatz/frontpages/bin/python
+#!/home/slzatz/frontpages/.venv/bin/python
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,7 +31,8 @@ def retrieve_images(url):
     select_images = list(dd.values())
 
     for index, value in enumerate(select_images):
-        select_images[index] = '/g'+value.removeprefix('/t') + '.jpg'
+        #select_images[index] = '/g'+value.removeprefix('/t') + '.jpg'
+        select_images[index] = '/g'+value.removeprefix('/t')
     
     with open('frontpageurls.py', 'w') as file:
         text = "urls = " + repr(select_images)

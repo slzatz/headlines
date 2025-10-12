@@ -1,4 +1,4 @@
-#!/home/slzatz/frontpages/bin/python
+#!/home/slzatz/frontpages/.venv/bin/python
 
 from flask import Flask, send_file
 import requests
@@ -42,7 +42,11 @@ def display_image(uri, w=None, h=None):
         print(f"wand.image.Image(file=BytesIO(response.content))"\
               f"generated exception from {uri} {e}")
         return False
-    img.transform(resize='825x1600>')
+
+    #img.transform(resize='825x1600>')
+    if w and h:
+        img.transform(resize=f"{w}x{h}>")
+
 
     if img.format == 'JPEG':
         #tf = NamedTemporaryFile(suffix='.rgba', delete=False)
@@ -62,7 +66,8 @@ def image():
 def imagejpg():
     #f = display_image("https://upload.wikimedia.org/wikipedia/commons/d/d5/Bob_Dylan_-_Azkena_Rock_Festival_2010_1.jpg", 800, 1200)
     partial_url = random.choice(urls)
-    f = display_image("https://www.frontpages.com" + partial_url, 800, 1200)
+    f = display_image("https://www.frontpages.com" + partial_url, 400, 800)
+    #f = display_image("https://www.frontpages.com" + partial_url)
     return send_file("fp.jpg", mimetype="image/jpg")
 
 if __name__ == "__main__":
