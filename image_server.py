@@ -68,7 +68,7 @@ def image():
 def imagejpg():
     #f = display_image("https://upload.wikimedia.org/wikipedia/commons/d/d5/Bob_Dylan_-_Azkena_Rock_Festival_2010_1.jpg", 800, 1200)
     partial_url = random.choice(urls)
-    f = display_image("https://www.frontpages.com" + partial_url, 400, 800)
+    f = display_image("https://www.frontpages.com" + partial_url)
     #f = display_image("https://www.frontpages.com" + partial_url)
     return send_file("fp.jpg", mimetype="image/jpg")
 
@@ -79,7 +79,7 @@ def newspaper(name):
         newspapers = json.load(f)
     selection = newspapers.get(name, None)
     if selection:
-        f = display_image("https://www.frontpages.com" + selection, 400, 800)
+        f = display_image("https://www.frontpages.com" + selection)
         return send_file("fp.jpg", mimetype="image/jpg")
     else:
         return f"No newspaper with name {name} found", 404
