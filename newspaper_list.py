@@ -1,7 +1,7 @@
 newspapers = [
-#"new-york-post", # us
+"new-york-post", # us
 "the-new-york-times", # us
-"the-wall-street-journal", # us
+#"the-wall-street-journal", # us
 "the-washington-post", # us
 "los-angeles-times", # us
 "the-boston-globe", # us
