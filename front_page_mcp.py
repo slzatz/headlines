@@ -14,6 +14,7 @@ from pathlib import Path
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image
 import wand.image
+from frontpages import retrieve_images
 
 # Initialize FastMCP server
 mcp = FastMCP("front_page_mcp")
@@ -79,6 +80,26 @@ def display_image(uri: str, w: int | None = None, h: int | None = None) -> bool:
         return False
 
 
+def _is_database_stale() -> bool:
+    """Check if the cached front pages are from today."""
+    from datetime import date
+    try:
+        with open(NEWSPAPERS_JSON, 'r') as f:
+            newspapers = json.load(f)
+        if not newspapers:
+            return True
+
+        # Get first newspaper URL and extract date
+        # URL format: /g/2025/10/14/newspaper-name...
+        first_url = next(iter(newspapers.values()))
+        parts = first_url.split('/')
+        db_date = f"{parts[2]}-{parts[3]}-{parts[4]}"
+        today = date.today().isoformat()
+        return db_date != today
+    except:
+        return True  # If we can't tell, assume stale
+
+
 @mcp.tool()
 def list_newspapers() -> list[str]:
     """
@@ -117,6 +138,10 @@ def get_newspaper(name: str) -> Image:
         Image object containing the newspaper front page as a JPEG.
         Raises an error if the newspaper is not found or cannot be retrieved.
     """
+    # Auto-update if database is stale
+    if _is_database_stale():
+        retrieve_images('https://www.frontpages.com/newspaper-list')
+
     try:
         # Load available newspapers
         with open(NEWSPAPERS_JSON, 'r') as f:
@@ -158,6 +183,26 @@ def get_newspaper(name: str) -> Image:
         raise
     except Exception as e:
         raise RuntimeError(f"Unexpected error: {str(e)}")
+
+
+@mcp.tool()
+def update_front_pages() -> str:
+    """
+    Update the list of available front pages to today's date.
+
+    Scrapes frontpages.com to get the latest front page URLs and updates
+    the local database (frontpageurls.json). Call this when you need access
+    to today's front pages rather than cached ones from a previous date.
+
+    Returns:
+        Success message with count of newspapers updated
+    """
+    try:
+        retrieve_images('https://www.frontpages.com/newspaper-list')
+        newspapers = list_newspapers()
+        return f"Successfully updated {len(newspapers)} newspaper front pages to today's date"
+    except Exception as e:
+        raise RuntimeError(f"Failed to update front pages: {str(e)}")
 
 
 if __name__ == "__main__":
