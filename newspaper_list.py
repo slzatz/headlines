@@ -13,7 +13,7 @@ newspapers = [
 "le-figaro", # france
 "le-parisien", # france
 "la-croix", # france
-"the-guardian", # uk
+"the-guardian-usa", # uk
 "the-daily-telegraph", # uk 
 "the-i-paper", # uk
 #"daily-mail", # uk #tabloid

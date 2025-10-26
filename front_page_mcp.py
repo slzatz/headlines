@@ -100,6 +100,18 @@ def _is_database_stale() -> bool:
         return True  # If we can't tell, assume stale
 
 
+def _get_newspaper_list() -> list[str]:
+    """Internal helper to get newspaper list."""
+    try:
+        with open(NEWSPAPERS_JSON, 'r') as f:
+            newspapers = json.load(f)
+        return sorted(newspapers.keys())
+    except FileNotFoundError:
+        return []
+    except json.JSONDecodeError:
+        return []
+
+
 @mcp.tool()
 def list_newspapers() -> list[str]:
     """
@@ -112,14 +124,7 @@ def list_newspapers() -> list[str]:
     Returns:
         List of newspaper identifier strings
     """
-    try:
-        with open(NEWSPAPERS_JSON, 'r') as f:
-            newspapers = json.load(f)
-        return sorted(newspapers.keys())
-    except FileNotFoundError:
-        return []
-    except json.JSONDecodeError:
-        return []
+    return _get_newspaper_list()
 
 
 @mcp.tool()
@@ -199,7 +204,7 @@ def update_front_pages() -> str:
     """
     try:
         retrieve_images('https://www.frontpages.com/newspaper-list')
-        newspapers = list_newspapers()
+        newspapers = _get_newspaper_list()
         return f"Successfully updated {len(newspapers)} newspaper front pages to today's date"
     except Exception as e:
         raise RuntimeError(f"Failed to update front pages: {str(e)}")
