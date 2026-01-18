@@ -1,67 +1,72 @@
 #!/home/slzatz/frontpages/.venv/bin/python
 
-import requests
-from bs4 import BeautifulSoup
-import shutil
-import os
 import json
+from playwright.sync_api import sync_playwright
 from newspaper_list import newspapers
 
-#url = 'https://www.frontpages.com/newspaper-list'  
 
-def retrieve_images(url):
-    response = requests.get(url)
-   
-    # Check if the request was successful
-    if response.status_code != 200:
-        print(f"Error accessing the page: {response.status_code}")
-        return []
+def retrieve_images(url=None):
+    """
+    Scrape front page URLs from frontpages.com using Playwright.
 
-    # Parse the content with BeautifulSoup
-    soup = BeautifulSoup(response.text, 'html.parser')
+    Visits each newspaper's individual page to capture the real image URLs
+    (which include extra characters added by JavaScript).
+    """
+    results = {}
 
-    # Find all image tags
-    images = soup.find_all('img')
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
 
-    # Filter for .webp images of front pages -- all those images have data-src
-    all_images = [img['data-src'] for img in images if img.get('data-src')]
-    #print(all_images[:5])
-    
-    d = {x[x.rfind("/")+1:x.rfind("-")]: x for x in all_images}
-    dd = {k: v for k,v in d.items() if k in newspapers}
-    select_images = list(dd.values())
+        for newspaper_name in newspapers:
+            newspaper_url = f"https://www.frontpages.com/{newspaper_name}"
+            print(f"Fetching: {newspaper_name}")
 
-    for index, value in enumerate(select_images):
-        #select_images[index] = '/g'+value.removeprefix('/t') + '.jpg'
-        select_images[index] = '/g'+value.removeprefix('/t')
-    
-    for key, value in dd.items():
-        dd[key] = '/g'+value.removeprefix('/t')
+            # Create a fresh page for each newspaper to avoid navigation conflicts
+            page = browser.new_page()
 
+            try:
+                page.goto(newspaper_url, timeout=45000, wait_until='domcontentloaded')
+                # Wait a bit for JavaScript to execute
+                page.wait_for_timeout(2000)
+
+                # Look for images with the newspaper name in the URL
+                all_imgs = page.query_selector_all('img')
+                for img in all_imgs:
+                    src = img.get_attribute('src') or ''
+                    if newspaper_name in src and ('.webp' in src or '.jpg' in src):
+                        img_url = src
+                        # Ensure it's the full-size path
+                        if '/t/' in img_url:
+                            img_url = img_url.replace('/t/', '/g/')
+                        # Store just the path portion
+                        if img_url.startswith('https://www.frontpages.com'):
+                            img_url = img_url.replace('https://www.frontpages.com', '')
+                        results[newspaper_name] = img_url
+                        print(f"  -> {img_url}")
+                        break
+                else:
+                    print(f"  -> Not found")
+
+            except Exception as e:
+                print(f"  -> Error: {e}")
+            finally:
+                page.close()
+
+        browser.close()
+
+    # Write Python list format for backward compatibility
+    select_images = list(results.values())
     with open('frontpageurls.py', 'w') as file:
         text = "urls = " + repr(select_images)
         file.write(text)
-# Serialization with json
 
+    # Write JSON format (primary format used by servers)
     with open('frontpageurls.json', 'w') as file:
-        json.dump(dd, file)
+        json.dump(results, file)
 
-    #file_path = '/home/slzatz/frontpages/frontpageurls.py'
+    print(f"\nUpdated {len(results)} newspaper URLs")
+    return results
 
-    ## Check if the file exists to avoid FileNotFoundError
-    #if os.path.exists(file_path):
-    #    os.remove(file_path)
-    #    print(f"File {file_path} has been removed.")
-    #else:
-    #    print(f"File {file_path} does not exist.")
-
-    #try:
-    #    shutil.move('frontpageurls.py', '/home/slzatz/inkplate_server/')
-    #    return f"fontpageurls.py has been successfully moved to inkplate_server"
-    #except FileNotFoundError:
-    #    return "File not found in the source directory."
-    #except Exception as e:
-    #    return f"An error occurred: {e}"
 
 if __name__ == '__main__':
-    retrieve_images('https://www.frontpages.com/newspaper-list')
+    retrieve_images()

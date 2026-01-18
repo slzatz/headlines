@@ -1,89 +1,126 @@
 #!/home/slzatz/frontpages/.venv/bin/python
 
 import argparse
-import requests
-from pathlib import Path
-import wand.image
-from io import BytesIO
-import random
 import json
-from frontpageurls import urls
-#from newspaper_list import newspapers
+from pathlib import Path
+from io import BytesIO
+from playwright.sync_api import sync_playwright
+import wand.image
+
+# Path to the JSON file containing newspaper URLs
+NEWSPAPERS_JSON = Path(__file__).parent / "frontpageurls.json"
 
 
-user_agent = "Mozilla/5.0 (Wayland; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-headers = {'User-Agent': user_agent}
+def fetch_image_with_playwright(uri: str, timeout: int = 30000) -> bytes | None:
+    """
+    Fetch an image using Playwright to bypass anti-scraping measures.
 
-def display_image(uri, w=None, h=None):
-    #global can_transfer_with_files
-    print(uri)
+    Args:
+        uri: Full URL to the image
+        timeout: Request timeout in milliseconds
+
+    Returns:
+        Image bytes if successful, None otherwise
+    """
     try:
-        response = requests.get(uri, timeout=5.0, headers=headers)
-    except (requests.exceptions.ConnectionError,
-            requests.exceptions.TooManyRedirects,
-            requests.exceptions.ChunkedEncodingError,
-            requests.exceptions.ReadTimeout) as e:
-        print(f"requests.get({uri}) generated exception:\n{e}")
-        return False
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
 
-    if response.status_code != 200:
-        print(f"status code = {response.status_code}")
-        return False
-        
-    # it is possible to have encoding == None and ascii == True
-    if response.encoding or response.content.isascii():
-        print(f"{uri} returned ascii text and not an image")
-        return False
+            # Navigate directly to the image URL
+            response = page.goto(uri, timeout=timeout)
 
-    # this try/except is needed for occasional bad/unknown file format
-    try:
-        img = wand.image.Image(file=BytesIO(response.content))
+            if response is None or response.status != 200:
+                print(f"Failed to fetch image: status={response.status if response else 'no response'}")
+                browser.close()
+                return None
+
+            # Get image bytes from response
+            image_bytes = response.body()
+            browser.close()
+            return image_bytes
+
     except Exception as e:
-        print(f"wand.image.Image(file=BytesIO(response.content))"\
-              f"generated exception from {uri} {e}")
+        print(f"Playwright error fetching {uri}: {e}")
+        return None
+
+
+def display_image(uri: str, w: int | None = None, h: int | None = None) -> bool:
+    """
+    Fetch and process a newspaper front page image using Playwright.
+
+    Args:
+        uri: Full URL to the image
+        w: Optional width for resizing
+        h: Optional height for resizing
+
+    Returns:
+        True if successful, False otherwise
+    """
+    print(f"Fetching: {uri}")
+
+    # Use Playwright to fetch the image
+    image_bytes = fetch_image_with_playwright(uri)
+
+    if image_bytes is None:
         return False
 
-    #img.transform(resize='825x1600>')
+    # Check if we got actual image data (not an error page)
+    if len(image_bytes) < 1000:
+        content_preview = image_bytes[:200].decode('utf-8', errors='replace')
+        if '<html' in content_preview.lower() or '<!doctype' in content_preview.lower():
+            print(f"Received HTML instead of image")
+            return False
+
+    # Process with Wand
+    try:
+        img = wand.image.Image(blob=image_bytes)
+    except Exception as e:
+        print(f"wand.image.Image error: {e}")
+        return False
+
     if w and h:
         img.transform(resize=f"{w}x{h}>")
 
+    # Convert to JPEG and save
+    img.format = 'jpeg'
+    img.compression_quality = 95
+    img.save(filename="fp.jpg")
+    img.close()
 
-    print("Hello")
-    if img.format == 'JPEG':
-        #tf = NamedTemporaryFile(suffix='.rgba', delete=False)
-        #img.save(filename = tf.name)
-        #return tf
-        img.save(filename = "fp.jpg")
-        img.close()
-        return True
-    else:
-        print("format is not JPEG")
-        return False
+    print("Image saved to fp.jpg")
+    return True
+
 
 if __name__ == "__main__":
-
-    NEWSPAPERS_JSON = Path(__file__).parent / "frontpageurls.json"
     parser = argparse.ArgumentParser(description="Fetch and display a newspaper front page image.")
     parser.add_argument("name", type=str, nargs="?", default=None,
-                        help="Name of the newspaper to fetch (e.g., 'nytimes'). If not provided, a random newspaper will be selected.")
+                        help="Name of the newspaper to fetch (e.g., 'the-new-york-times'). If not provided, lists available newspapers.")
     args = parser.parse_args()
     name = args.name
+
     try:
         # Load available newspapers
         with open(NEWSPAPERS_JSON, 'r') as f:
             newspapers = json.load(f)
 
+        if name is None:
+            print("Available newspapers:")
+            for n in sorted(newspapers.keys()):
+                print(f"  {n}")
+            exit(0)
+
         # Check if newspaper exists
         if name not in newspapers:
             available = ", ".join(sorted(newspapers.keys())[:10])
-            raise ValueError(f"Newspaper '{name}' not found. Available newspapers include: {available}... (use list_newspapers for full list)")
+            raise ValueError(f"Newspaper '{name}' not found. Available newspapers include: {available}...")
 
         # Get the partial URL for this newspaper
         partial_url = newspapers[name]
         full_url = "https://www.frontpages.com" + partial_url
 
         # Fetch and save the image (resized for MCP compatibility)
-        success = display_image(full_url, w=900, h=1050)
+        success = display_image(full_url, w=1000, h=1500)
 
         if not success:
             raise RuntimeError(f"Failed to retrieve front page for '{name}'. The image may be temporarily unavailable.")
@@ -95,8 +132,6 @@ if __name__ == "__main__":
     except json.JSONDecodeError:
         raise ValueError("Newspapers database is corrupted. Run frontpages.py to regenerate it.")
     except (ValueError, RuntimeError):
-        # Re-raise our own exceptions
         raise
     except Exception as e:
         raise RuntimeError(f"Unexpected error: {str(e)}")
-

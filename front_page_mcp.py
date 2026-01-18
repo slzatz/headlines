@@ -8,9 +8,8 @@ for analysis by Claude and other AI assistants.
 """
 
 import json
-import requests
-from io import BytesIO
 from pathlib import Path
+from playwright.sync_api import sync_playwright
 from fastmcp import FastMCP
 from fastmcp.utilities.types import Image
 import wand.image
@@ -19,17 +18,47 @@ from frontpages import retrieve_images
 # Initialize FastMCP server
 mcp = FastMCP("front_page_mcp")
 
-# Configuration from image_server.py
-user_agent = "Mozilla/5.0 (Wayland; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-headers = {'User-Agent': user_agent}
-
 # Path to the JSON file containing newspaper URLs
 NEWSPAPERS_JSON = Path(__file__).parent / "frontpageurls.json"
 
 
-def display_image(uri: str, w: int | None = None, h: int | None = None) -> bool:
+def _fetch_image_with_playwright(uri: str, timeout: int = 30000) -> bytes | None:
     """
-    Fetch and process a newspaper front page image.
+    Fetch an image using Playwright to bypass anti-scraping measures.
+
+    Args:
+        uri: Full URL to the image
+        timeout: Request timeout in milliseconds
+
+    Returns:
+        Image bytes if successful, None otherwise
+    """
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+
+            # Navigate directly to the image URL
+            response = page.goto(uri, timeout=timeout)
+
+            if response is None or response.status != 200:
+                print(f"Failed to fetch image: status={response.status if response else 'no response'}")
+                browser.close()
+                return None
+
+            # Get image bytes from response
+            image_bytes = response.body()
+            browser.close()
+            return image_bytes
+
+    except Exception as e:
+        print(f"Playwright error fetching {uri}: {e}")
+        return None
+
+
+def _fetch_and_save_image(uri: str, w: int | None = None, h: int | None = None) -> bool:
+    """
+    Fetch and process a newspaper front page image using Playwright.
 
     Args:
         uri: Full URL to the image
@@ -39,45 +68,37 @@ def display_image(uri: str, w: int | None = None, h: int | None = None) -> bool:
     Returns:
         True if successful, False otherwise
     """
-    print(uri)
+    print(f"Fetching: {uri}")
+
+    # Use Playwright to fetch the image
+    image_bytes = _fetch_image_with_playwright(uri)
+
+    if image_bytes is None:
+        return False
+
+    # Check if we got actual image data (not an error page)
+    if len(image_bytes) < 1000:
+        content_preview = image_bytes[:200].decode('utf-8', errors='replace')
+        if '<html' in content_preview.lower() or '<!doctype' in content_preview.lower():
+            print(f"Received HTML instead of image")
+            return False
+
+    # Process with Wand
     try:
-        response = requests.get(uri, timeout=5.0, headers=headers)
-    except (requests.exceptions.ConnectionError,
-            requests.exceptions.TooManyRedirects,
-            requests.exceptions.ChunkedEncodingError,
-            requests.exceptions.ReadTimeout) as e:
-        print(f"requests.get({uri}) generated exception:\n{e}")
-        return False
-
-    if response.status_code != 200:
-        print(f"status code = {response.status_code}")
-        return False
-
-    # it is possible to have encoding == None and ascii == True
-    if response.encoding or response.content.isascii():
-        print(f"{uri} returned ascii text and not an image")
-        return False
-
-    # this try/except is needed for occasional bad/unknown file format
-    try:
-        img = wand.image.Image(file=BytesIO(response.content))
+        img = wand.image.Image(blob=image_bytes)
     except Exception as e:
-        print(f"wand.image.Image(file=BytesIO(response.content))"
-              f"generated exception from {uri} {e}")
+        print(f"wand.image.Image error: {e}")
         return False
 
     if w and h:
         img.transform(resize=f"{w}x{h}>")
 
-    if img.format == 'JPEG':
-        # Set high quality for better text readability
-        img.compression_quality = 95
-        img.save(filename="fp.jpg")
-        img.close()
-        return True
-    else:
-        print("format is not JPEG")
-        return False
+    # Convert to JPEG and save with high quality for text readability
+    img.format = 'jpeg'
+    img.compression_quality = 95
+    img.save(filename="fp.jpg")
+    img.close()
+    return True
 
 
 def _is_database_stale() -> bool:
@@ -162,7 +183,7 @@ def get_newspaper(name: str) -> Image:
         full_url = "https://www.frontpages.com" + partial_url
 
         # Fetch and save the image (resized for MCP compatibility)
-        success = display_image(full_url, w=1000, h=1500)
+        success = _fetch_and_save_image(full_url, w=1000, h=1500)
 
         if not success:
             raise RuntimeError(f"Failed to retrieve front page for '{name}'. The image may be temporarily unavailable.")
