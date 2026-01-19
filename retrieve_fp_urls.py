@@ -5,7 +5,7 @@ from playwright.sync_api import sync_playwright
 from newspaper_list import newspapers
 
 
-def retrieve_images(url=None):
+def retrieve_urls(url=None):
     """
     Scrape front page URLs from frontpages.com using Playwright.
 
@@ -55,10 +55,10 @@ def retrieve_images(url=None):
         browser.close()
 
     # Write Python list format for backward compatibility
-    select_images = list(results.values())
-    with open('frontpageurls.py', 'w') as file:
-        text = "urls = " + repr(select_images)
-        file.write(text)
+    #select_images = list(results.values())
+    #with open('frontpageurls.py', 'w') as file:
+    #    text = "urls = " + repr(select_images)
+    #    file.write(text)
 
     # Write JSON format (primary format used by servers)
     with open('frontpageurls.json', 'w') as file:
@@ -69,4 +69,4 @@ def retrieve_images(url=None):
 
 
 if __name__ == '__main__':
-    retrieve_images()
+    retrieve_urls()

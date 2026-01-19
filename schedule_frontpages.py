@@ -2,9 +2,9 @@
 
 import schedule
 import time
-from frontpages import retrieve_images
+from retieve_fp_urls import retrieve_urls
 
-schedule.every().day.at("10:00").do(retrieve_images, url='https://www.frontpages.com/newspaper-list')
+schedule.every().day.at("10:00").do(retrieve_urls, url='https://www.frontpages.com/newspaper-list')
 
 while True:
     schedule.run_pending()
